@@ -5,6 +5,17 @@ import {dependantKeys} from './chain.js';
 // What the game logs say about tasks that are not finished: accepted (in progress) or failed. Display only, kept in this browser. Nothing here changes your ticks.
 const KEY='tpp2_ui_logstate',EV='pd-logstate';
 const read=()=>{try{const o=JSON.parse(localStorage.getItem(KEY));return {open:o&&o.open||[],failed:o&&o.failed||[],at:o&&o.at||0}}catch{return {open:[],failed:[],at:0}}};
+// A new prestige starts with no log history: what the logs said about the last prestige's tasks no longer applies (hotfix 1.22.1).
+export function resetLogHistory(){
+  try{localStorage.removeItem(KEY);localStorage.removeItem('tpp2_ui_logslast');localStorage.setItem('tpp2_ui_logfix','1')}catch{}
+  window.dispatchEvent(new Event(EV));
+}
+// Prestiges set up before 1.22.1 have no start time. The first time one is opened in 1.22.1 or later, it counts as starting then,
+// and the old log history is cleared once for everyone (user decision, 16 Oct 2026), so the last prestige's messages stop being offered.
+export function fixOldLogHistory(){
+  try{if(localStorage.getItem('tpp2_ui_logfix'))return;localStorage.setItem('tpp2_ui_logfix','1')}catch{return}
+  resetLogHistory();
+}
 // merge a fresh import into what is already known: the new logs win for tasks they mention, older knowledge is kept for the rest
 export function saveLogState(res){
   const old=read(),seen=new Set([...res.done,...res.open,...res.failed]);

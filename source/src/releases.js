@@ -1,7 +1,9 @@
 // Release notes shown when you click the maker's mark. Newest first. Add a new entry at the top for each update
 // and bump VERSION to match. Numbering runs 1.01, 1.02, 1.03 and so on, so the next one after 1.21 is 1.22. An entry can have an optional name in t:.
-export const VERSION='1.22';
+export const VERSION='1.22.1';
 export const RELEASES=[
+  {t:'Hotfix',v:'1.22.1',x:true,d:'16 Oct 2026',n:['Starting a new prestige now clears what your game logs said about the last one, and only log messages from after it started are read, so tasks from your last prestige are no longer offered again. A prestige you were already on counts from the day you update.',
+    'Import game logs has a new Clear log history button, for starting fresh whenever you want.']},
   {v:'1.22',x:true,d:'16 Oct 2026',about:{title:'Introducing experimental features',body:['This is our first experimental feature update. These features are still in heavy development and may change a lot, or be removed, before they join the main site.',
     'They are switched off until you turn them on, and they always appear in pink.',
     'Until they are rolled into the main release, you will find every experimental feature in the Experimental window. Open it with the pink Experimental button at the top of the page, and use the button inside to turn the features on.']},n:['After Setup you are asked once whether to turn experimental features on.',

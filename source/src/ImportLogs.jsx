@@ -3,7 +3,7 @@ import {Chip,Chev,Modal,ModalFoot,CloseBtn,HowTo,ExpNote,Bk} from './ui.jsx';
 import {autoSnap} from './Backup.jsx';
 import {readLogs,droppedLogs,fromInput,canWatch,savedHandle,forgetHandle,chooseHandle,openHandle} from './logs.js';
 import {useLS} from './useLS.js';
-import {saveLogState} from './LogStatus.jsx';
+import {saveLogState,resetLogHistory} from './LogStatus.jsx';
 import {prereqsOf} from './chain.js';
 
 const nice=k=>{const [t,...x]=k.split('|');return {t,x:x.join('|')}};
@@ -25,7 +25,10 @@ export default function ImportLogs({open,onClose,s,setS}){
   const [saved,setSaved]=React.useState(null);
   React.useEffect(()=>{if(open)savedHandle().then(setSaved)},[open]);
   const dirRef=React.useRef(null),fileRef=React.useRef(null);
-  const reset=()=>{setRes(null);setPick({});setErr('');setDone('');setBusy(false)};
+  // Manual clear (hotfix 1.22.1): forget what the logs said so far and read only messages from now on. Ticks are not touched.
+  const [ask,setAsk]=React.useState(false);
+  const clearNow=()=>{resetLogHistory();setLast(null);setS(o=>({...o,n:{...o.n,logFrom:Math.floor(Date.now()/1000)}}));setAsk(false);setDone('Log history cleared. Only log messages from now on are read.')};
+  const reset=()=>{setRes(null);setPick({});setErr('');setDone('');setBusy(false);setAsk(false)};
   React.useEffect(()=>{if(!open)reset()},[open]);
 
   const handle=async list=>{
@@ -33,7 +36,7 @@ export default function ImportLogs({open,onClose,s,setS}){
     if(!list.some(x=>/push-notifications.*\.log$/i.test(x.file.name))){setErr('No notification logs found in that selection. Choose the Logs folder (or one of the dated folders inside it).');return}
     setBusy(true);
     try{
-      const r=await readLogs(list);const p={};
+      const r=await readLogs(list,s.n.logFrom||0);const p={};
       r.done.forEach(k=>{p[tkey(k)]=!s.c[tkey(k)]});
       setRes(r);setPick(p);saveLogState(r);
     }catch(e){setErr('Could not read the logs: '+(e&&e.message||e))}
@@ -93,6 +96,11 @@ export default function ImportLogs({open,onClose,s,setS}){
           </div></details></div>}
       {busy&&<div role="status" className="text-xs text-zinc-400">Reading logs…</div>}
     </div>}
+    {!res&&(ask
+      ?<div className="rounded-xl border border-pink-400/40 bg-pink-400/5 p-4 grid gap-3"><div className="text-sm text-zinc-200">This forgets what your logs said so far: tasks in progress, failed tasks and your last import. Only log messages from now on are read. Your ticks stay as they are.</div>
+        <div className="flex flex-wrap gap-2"><button onClick={clearNow} className="rounded-lg bg-pink-500 text-black text-sm font-semibold px-4 py-1.5 hover:bg-pink-400">Clear log history</button><button onClick={()=>setAsk(false)} className="rounded-lg border border-zinc-600 text-zinc-300 text-sm px-4 py-1.5 hover:bg-white/5">Cancel</button></div></div>
+      :<div className="rounded-xl border border-zinc-800 p-4 flex flex-wrap items-center gap-x-4 gap-y-2"><div className="flex-1 min-w-[12rem] grid gap-0.5"><div className="text-sm text-zinc-200">Log history</div><div className="text-xs text-zinc-400">Starting fresh, for example after a wipe? Clear what your logs said so far.</div></div>
+        <button onClick={()=>{setDone('');setAsk(true)}} disabled={busy} className="rounded-lg border border-pink-500/50 text-pink-300 text-sm px-3 py-1.5 hover:bg-pink-500/10 disabled:opacity-50 max-sm:w-full">Clear log history</button></div>)}
     {err&&<div role="alert" className="text-sm text-red-300">{err}</div>}
     {done&&<div role="status" className="rounded-lg border border-green-400/30 bg-green-400/5 p-3 text-sm text-green-200">{done}</div>}
     {res&&<div className="grid gap-4">

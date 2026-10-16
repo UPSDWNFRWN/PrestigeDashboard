@@ -27,18 +27,20 @@ export function sessionMode(text){
 const dirOf=p=>{const i=p.lastIndexOf('/');return i<0?'':p.slice(0,i)};
 
 // files: [{file, path}] -> summary
-export async function readLogs(files){
+// since: unix seconds when the current prestige was set up (0 = read everything). Messages from before it belong to an earlier prestige and are skipped (hotfix 1.22.1).
+export async function readLogs(files,since=0){
   const notif=files.filter(f=>/push-notifications.*\.log$/i.test(f.file.name));
   const back=files.filter(f=>/backend.*\.log$/i.test(f.file.name));
   const modeOf={};
   for(const b of back){const d=dirOf(b.path);if(modeOf[d])continue;modeOf[d]=sessionMode(await b.file.text())}
   const done=new Map(),last=new Map(),unknown=new Set();
-  let nPve=0,nPvp=0,nUnk=0,minDt=0,maxDt=0;
+  let nPve=0,nPvp=0,nUnk=0,minDt=0,maxDt=0,nOld=0;
   for(const n of notif){
     const mode=modeOf[dirOf(n.path)]||'';
     if(mode==='pvp'){nPvp++;continue}
     mode==='pve'?nPve++:nUnk++;
     for(const e of parseNotifications(await n.file.text())){
+      if(since&&!(e.dt>=since)){nOld++;continue}
       const key=IDS[e.id];
       if(!key){unknown.add(e.id);continue}
       if(e.dt){minDt=minDt?Math.min(minDt,e.dt):e.dt;maxDt=Math.max(maxDt,e.dt)}
@@ -49,7 +51,7 @@ export async function readLogs(files){
   // the most recent message about a task decides its state: accepted again after a fail means open, failed after accepting means failed, and finished beats both
   const open=[...last].filter(([k,v])=>v.kind==='started'&&!done.has(k)).map(([k])=>k);
   const failed=[...last].filter(([k,v])=>v.kind==='failed'&&!done.has(k)).map(([k])=>k);
-  return {doneAt:Object.fromEntries(done),nFiles:notif.length,nPve,nPvp,nUnk,done:[...done.keys()],open,failed,unknown:unknown.size,from:minDt,to:maxDt};
+  return {doneAt:Object.fromEntries(done),nFiles:notif.length,nPve,nPvp,nUnk,done:[...done.keys()],open,failed,unknown:unknown.size,from:minDt,to:maxDt,nOld};
 }
 
 // Walk a dropped folder, keeping each file's path so sessions can be told apart.

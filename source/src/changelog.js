@@ -3,7 +3,7 @@ import {STORY} from './story.js';
 import {NB_TEMPLATE} from './nb.js';
 import {CQUESTS} from './data.js';
 
-const SKIP=/^(wizDone|wizSkip|wizRe|start|faction|name|skipIgnore|prev:.*)$/;
+const SKIP=/^(wizDone|wizSkip|wizRe|start|faction|name|skipIgnore|logFrom|prev:.*)$/;
 const stepOf=id=>{for(const n in STORY){const x=STORY[n].steps.find(y=>y.id===id);if(x)return x.t}return id};
 // Plain-English name for a saved key, and whether it is a number or a tick.
 export function describe(k,cy){

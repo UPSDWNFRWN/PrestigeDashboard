@@ -1,4 +1,5 @@
 import {VERSION} from './releases.js';
+import {resetLogHistory,fixOldLogHistory} from './LogStatus.jsx';
 import React,{useEffect} from 'react';
 import TradersTab from './TradersTab.jsx';
 import PlanTab from './PlanTab.jsx';
@@ -35,6 +36,11 @@ const Title=({right,noGen,after})=>{const ex=useExp();return <header className="
   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-3 max-sm:gap-x-1.5 max-sm:pb-5"><div className="max-sm:basis-full max-sm:pr-28"><h1 className="text-2xl font-bold text-amber-500">Prestige Dashboard</h1><p className="text-[10px] leading-3 text-zinc-500"><span className={'font-semibold '+(ex?'text-pink-400':'text-zinc-600')}>Version {VERSION}{ex?'E':''}</span> · <span className="text-[#7e7e87]">Data checked on 16 Oct 2026</span></p></div>{right}<Backup noGen={noGen}/>{after}<WelcomeBtn/></div>
 </header>};
 
+// The first time a prestige's setup is finished, that moment is when it started: game logs from before it belong to the last prestige (hotfix 1.22.1).
+// Running setup again later (wizRe) keeps the start time and the log history.
+const isNewStart=o=>!o.n.wizRe&&!o.n.logFrom;
+const logFromOf=o=>isNewStart(o)?{logFrom:Math.floor(Date.now()/1000)}:{};
+const startLogs=o=>{if(isNewStart(o))resetLogHistory()};
 function Cycle({cy,choose}){
 const [s,setS]=useLS('tpp2_cycle_'+cy.p,{n:{},c:{}});const setupNew=useSetupNew();const [picking,setPicking]=React.useState(false);
 const navRef=React.useRef(null);
@@ -45,6 +51,8 @@ const mig=React.useRef(false);
 React.useEffect(()=>{if(!Object.keys(s.c).some(k=>k.startsWith('cq:')||/^cs:\d+$/.test(k)))return;
   mig.current=true;setS(o=>{const c={...o.c};CQUESTS.forEach(q=>{if(c['cq:'+q.id])c[cqKey(q)]=true;delete c['cq:'+q.id]});Object.keys(c).forEach(k=>{if(/^cs:\d+$/.test(k)){c['cs:sbih:'+k.slice(3)]=c[k];delete c[k]}});return {...o,c}})},[]);
 const [log,setLog]=useLS('tpp2_log_'+cy.p,[]);
+// A prestige set up before 1.22.1 (or restored from an older backup code) has no start time: it gets one now, so game logs from before today are not read for it (hotfix 1.22.1).
+React.useEffect(()=>{if(!s.n.wizDone||s.n.logFrom)return;fixOldLogHistory();mig.current=true;setS(o=>o.n.logFrom||!o.n.wizDone?o:({...o,n:{...o.n,logFrom:Math.floor(Date.now()/1000)}}))},[s.n.wizDone,s.n.logFrom]);
 // Put one logged change back the way it was. The undo itself is not logged; the entry is simply removed.
 const undoEntry=e=>{mig.current=true;setS(o=>{const n={...o.n},c={...o.c};
   if(typeof e.v==='boolean')c[e.k]=!e.v;else if(e.f===undefined)delete n[e.k];else n[e.k]=e.f;return {...o,n,c}});
@@ -69,7 +77,7 @@ const expOn=useExp();
 React.useEffect(()=>{const n=navRef.current;if(!n)return;const f=()=>{n.dataset.l=n.scrollLeft>4?'1':'';n.dataset.r=n.scrollLeft+n.clientWidth<n.scrollWidth-4?'1':''};f();n.addEventListener('scroll',f,{passive:true});window.addEventListener('resize',f);return()=>{n.removeEventListener('scroll',f);window.removeEventListener('resize',f)}},[]);
 React.useEffect(()=>{const n=navRef.current,b=n&&n.querySelector('[aria-current=page]');if(b&&n.scrollWidth>n.clientWidth)n.scrollTo({left:b.offsetLeft-(n.clientWidth-b.offsetWidth)/2,behavior:'smooth'})},[tab]); // phone: keep the open tab in view
 if(picking)return <div><Title noGen/><Picker current={cy.p} onResetCurrent={()=>{setS({n:{},c:{}});setLog([])}} onBack={()=>setPicking(false)} pick={p=>{if(p===cy.p){setPicking(false);if(s.n.wizDone)setS(o=>({...o,n:{...o.n,wizDone:0,wizRe:1}}))}else choose(p)}}/></div>;
-if(!s.n.wizDone)return <div className={'acc acc-p'+cy.p}><Title noGen/><Wizard changePrestige={()=>setPicking(true)} cy={cy} s={s} set={set} setS={setS} tg={tg} finish={()=>setS(o=>({...o,n:{...o.n,wizDone:1,wizSkip:0,wizRe:0,...(!o.n.wizRe&&!expOn&&!o.n.expAsked?{expAsk:1}:{})}}))} skip={()=>setS(o=>({...o,n:{...o.n,wizDone:1,wizSkip:1,wizRe:0}}))}/></div>;
+if(!s.n.wizDone)return <div className={'acc acc-p'+cy.p}><Title noGen/><Wizard changePrestige={()=>setPicking(true)} cy={cy} s={s} set={set} setS={setS} tg={tg} finish={()=>{startLogs(s);setS(o=>({...o,n:{...o.n,...logFromOf(o),wizDone:1,wizSkip:0,wizRe:0,...(!o.n.wizRe&&!expOn&&!o.n.expAsked?{expAsk:1}:{})}}))}} skip={()=>{startLogs(s);setS(o=>({...o,n:{...o.n,...logFromOf(o),wizDone:1,wizSkip:1,wizRe:0}}))}}/></div>;
 if(s.n.expAsk)return <div className={'acc acc-p'+cy.p}><Title noGen/><ExpAfterSetup onDone={()=>setS(o=>{const n={...o.n,expAsked:1};delete n.expAsk;return {...o,n}})}/></div>;
 return <div className={'acc acc-p'+cy.p+' grid gap-4'}>
 <div><Title right={<><span className="relative inline-flex"><OrangeBtn onClick={()=>setPicking(true)}>Run Setup</OrangeBtn>{setupNew.any&&<NewPip label={'Setup has changed: '+setupNew.fresh.join(', ')} className="-top-1 -right-1"/>}</span><ImportShots cy={cy} s={s} setS={setS}/></>} after={<Experiments s={s} setS={setS}/>}/>
